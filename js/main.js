@@ -80,6 +80,9 @@ var GameManager = {
         requestFrame();
       });
     }
+    if (!this.interval) this.interval = setInterval(() => {
+      GameManager.tick();
+    }, this.tick_rate);
   },
 
   tick() {
