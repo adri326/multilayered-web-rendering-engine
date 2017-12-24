@@ -5,11 +5,11 @@ var GameManager = {
       this.contexts = this.layers.map(layer => layer.getContext("2d"));
       this.scenes = [];
       this.active_scene = 0;
-      this.loop = false;
       this.last_frame = performance.now();
       this.fps = 0;
       this.tick_rate = 100;
       this.tick_count = 0;
+      this.looping = false;
     }
 
     if (data) {
@@ -28,19 +28,10 @@ var GameManager = {
       window.msRequestAnimationFrame;
     window.requestAnimationFrame = requestAnimationFrame;
 
-    this.contexts.forEach(context => { // Disables the image smoothing feature
-      context.imageSmoothingEnabled = false;
-      context.mozImageSmoothingEnabled = false;
-      context.webkitImageSmoothingEnabled = false;
-      context.msImageSmoothingEnabled = false;
-    });
+    this.set_interpolation();
 
-    if (this.loop) {
-      console.log("Banana?");
-      if (!this.interval) this.interval = setInterval(this.tick.bind(this), this.tick_rate);
-      window.requestAnimationFrame(() => {
-        GameManager.frame();
-      });
+    if (this.looping) {
+      this.loop();
     }
   },
 
@@ -65,25 +56,48 @@ var GameManager = {
   },
 
   frame() {
-    this.layers.forEach((layer, id) => {
-      if (layer.width != layer.clientWidth) layer.width = this.contexts[id].width = layer.clientWidth;
-      if (layer.height != layer.clientHeight) layer.height = this.contexts[id].height = layer.clientHeight;
-    });
+    if (this.layers[0].width != this.layers[0].clientWidth || this.layers[0].height != this.layers[0].clientHeight) {
+      this.layers.forEach((layer, id) => {
+        layer.width = this.contexts[id].width = layer.clientWidth;
+        layer.height = this.contexts[id].height = layer.clientHeight;
+      });
+      this.set_interpolation();
+    }
     this.scenes[this.active_scene].draw();
-    if (this.loop) {
+
+  },
+
+  loop() {
+    requestFrame();
+    function requestFrame() {
       window.requestAnimationFrame(() => {
-        GameManager.frame();
+        if (GameManager.looping) {
+          GameManager.frame();
+          GameManager.fps = (GameManager.fps + 10 / (performance.now() - GameManager.last_frame)) / 1.01;
+          GameManager.last_frame = performance.now();
+          (document.getElementById("fps-counter") || {}).innerText = Math.round(GameManager.fps, 2) + " fps";
+        }
+        requestFrame();
       });
     }
-    this.fps = (this.fps + 1000 / (performance.now() - this.last_frame)) / 2;
-    this.last_frame = performance.now();
   },
 
   tick() {
-    this.tick_count++;
-    if (scene = this.scenes[this.active_scene]) {
-      scene.tick(this.tick_count);
+    if (this.looping) {
+      this.tick_count++;
+      if (scene = this.scenes[this.active_scene]) {
+        scene.tick(this.tick_count);
+      }
     }
+  },
+
+  set_interpolation() {
+    this.contexts.forEach(context => { // Disables the image smoothing feature
+      context.imageSmoothingEnabled = false;
+      context.mozImageSmoothingEnabled = false;
+      context.webkitImageSmoothingEnabled = false;
+      context.msImageSmoothingEnabled = false;
+    });
   }
 }
 
@@ -95,10 +109,12 @@ var GameObject = {
   },
 
   draw: function(x, y, width, height, context, frame) {
-    //console.log(this, frame);
     if (image = this.frames[frame]) {
-      //console.log(image);
+      let t = performance.now();
       context.drawImage(image, x, y, width, height);
+      if ((d = performance.now() - t) > 4) {
+        console.log(d, image, x, y, width, height);
+      }
     }
   }
 }
@@ -125,10 +141,12 @@ var Scene = {
           frames: (raw.frames || []).map(url => {
             var img = new Image();
             img.src = url;
-            promises.push(new Promise((resolve, reject) => {
-              img.onload = resolve;
-              img.onerror = reject;
-            }));
+            if (!img.complete) {
+              promises.push(new Promise((resolve, reject) => {
+                img.onload = resolve;
+                img.onerror = reject;
+              }));
+            }
             return img;
           })
         };
@@ -185,28 +203,34 @@ var Scene = {
     this.elements.forEach(element => {
       if (parent = this.objects[element.name]) {
         if (parent.onbeforedraw) parent.onbeforedraw(element);
+        let layer = GameManager.get_layer(element.layer);
+        let context = GameManager.get_context(element.layer);
         if (element.fixed) {
-          let layer = GameManager.get_layer(element.layer);
-          let context = GameManager.get_context(element.layer);
           context.globalCompositeOperation = parent.composite_operation || this.composite_operations[element.layer] || "normal";
           parent.draw(
             element.x,
             element.y,
             element.width * (element.size_relative ? layer.clientWidth : 1),
             element.height * (element.size_relative ? layer.clientHeight : 1),
-            GameManager.get_context(element.layer),
+            context,
             element.frame
           );
         }
         else {
-          parent.draw(
-            (element.x - this.vx) * this.scale,
-            (element.y - this.vy) * this.scale,
-            element.width * this.scale,
-            element.height * this.scale,
-            GameManager.get_context(element.layer),
-            element.frame
-          );
+          let x = (element.x - this.vx) * this.scale;
+          let y = (element.y - this.vy) * this.scale;
+          let w = element.width * this.scale;
+          let h = element.height * this.scale;
+          if (x < layer.width && y < layer.height && x + w > 0 && y + h > 0) {
+            parent.draw(
+              x,
+              y,
+              w,
+              h,
+              context,
+              element.frame
+            );
+          }
         }
       }
     });
@@ -231,6 +255,6 @@ Array.prototype.insert = function(index) {
   return this;
 };
 
-window.onresize = () => {
+/*window.onresize = () => {
   GameManager.init();
-}
+}*/

@@ -5,4 +5,4 @@ You can see how it performs [here](https://adri326.github.io/multilayered-web-re
 
 The engine has one main element where the different canvas are stored, aswell as the different scenes. Scenes contain `GameObjects` and implementation of these `GameObjects`, called `elements`
 
-Note that this engine is not optimised **at all**. It just stupidly draws every `element` it can find to draw; this is just a proof of concept to show what you can do with the wonderful `mix-blend-mode` feature, combined with canvases.
+Note that this engine is not meant to be used for any big project, it's a small engine I quickly put together and that is not meant to be used for any big project; it just stupidly draws every `element` it can find to draw; this is just a proof of concept to show what you can do with the wonderful `mix-blend-mode` feature, combined with canvases.

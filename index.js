@@ -58,7 +58,7 @@ window.addEventListener("load", function() {
     document.getElementById('layer-1'),
     document.getElementById('layer-2')
   ], {
-    loop: true
+    looping: true
   });
   var promises = [];
   scenes.forEach(scene => {
@@ -116,9 +116,5 @@ window.addEventListener("load", function() {
 
     scene.add_element("lamp", 98, 32, 32, 32);
     scene.add_element("lamp", 64, 0, 98, 98, 1, 1);
-
-
-    GameManager.loop = true;
-    GameManager.frame();
   }).catch(console.error);
 });
